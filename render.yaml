@@ -1,0 +1,20 @@
+# render.yaml
+services:
+  - type: web  # Use 'web' for FastAPI + bot dashboard
+    name: telegram-stremio
+    env: docker
+    repo: https://github.com/Asif1q/Telegram-Stremio.git
+    branch: main
+    plan: free
+    buildCommand: ""  # Dockerfile handles build
+    startCommand: bash start.sh  # matches your Dockerfile CMD
+    autoDeploy: true
+    envVars:
+      - key: DEBIAN_FRONTEND
+        value: noninteractive
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: LANG
+        value: en_US.UTF-8
+      - key: PATH
+        value: /app/.venv/bin:$PATH
