@@ -237,7 +237,7 @@ All environment variables for this project are defined in the `config.env` file.
 
 | Variable | Description |
 | :--- | :--- |
-| **`BASE_URL`** | The Public IP of your server or domain or heroku app URL (e.g. `http://182.xxx.xxx.xxx` or `https://your-domain.com`). Crucial for Stremio addon setup. |
+| **`BASE_URL`** | The Domain or Heroku app URL (e.g. `https://your-domain.com`). Crucial for Stremio addon setup. |
 | **`PORT`** | The port number on which your FastAPI server will run. *Default: `8000`*. |
 
 ### 🔄 Update Settings
@@ -293,10 +293,13 @@ Before you begin, ensure you have:
 
 Follow the instructions provided in the Google Colab Tool to deploy on Heroku.
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/weebzone/Colab-Tools/blob/main/telegram%20media%20server.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/weebzone/Colab-Tools/blob/main/telegram%20stremio.ipynb)
 
 
 ## 🐳 VPS Guide
+
+This section explains how to deploy your **Telegram Stremio Media Server** on a VPS using **Docker Compose (recommended)** or **Docker**.
+
 
 ### 1️⃣ Step 1: Clone & Configure the Project
 
@@ -307,83 +310,122 @@ mv sample_config.env config.env
 nano config.env
 ```
 
-- Fill in all required variables in `config.env`.
-- Press `Ctrl + O`, then `Enter`, then `Ctrl + X` to save and exit.
+* Fill in all required variables in `config.env`.
+* Press `Ctrl + O`, then `Enter`, then `Ctrl + X` to save and exit.
 
-### 2️⃣ Step 2: Deploy with Docker
+## ⚙️ Step 2: Choose Your Deployment Method
+
+You can deploy the server using either **Docker Compose (recommended)** or **plain Docker**.
+
+
+
+### 🟢 **Option 1: Deploy with Docker Compose (Recommended)**
+
+Docker Compose provides an easier and more maintainable setup, environment mounting, and restart policies.
+
+#### 🚀 Start the Container
 
 ```bash
-docker build -t tsms .
-docker run -d -p 8000:8000 tsms
+docker compose up -d
 ```
 
-Your Code should now be running at:  
+Your server will now be running at:
 ➡️ `http://<your-vps-ip>:8000`
 
------
+---
 
-### 🌐 Step 3: Add Domain
+#### 🛠️ Update `config.env` While Running
 
-#### A. Set Up DNS Records
+If you need to modify environment values (like `BASE_URL`, `AUTH_CHANNEL`, etc.):
 
-Go to your domain's DNS settings and add the following **A record**:
+1. **Edit the file:**
+
+   ```bash
+   nano config.env
+   ```
+2. **Save your changes:** (`Ctrl + O`, `Enter`, `Ctrl + X`)
+3. **Restart the container to apply updates:**
+
+   ```bash
+   docker compose restart
+   ```
+
+⚡ Since the config file is mounted, you **don’t need to rebuild** the image — changes apply automatically on restart.
+
+
+
+### 🔵 **Option 2: Deploy with Docker (Manual Method)**
+
+If you prefer not to use Docker Compose, you can manually build and run the container.
+
+#### 🧩 Build the Image
+
+```bash
+docker build -t telegram-stremio .
+```
+
+#### 🚀 Run the Container
+
+```bash
+docker run -d -p 8000:8000 telegram-stremio
+```
+
+Your server should now be running at:
+➡️ `http://<your-vps-ip>:8000`
+
+
+
+### 🌐 Step 3: Add Domain (Required)
+
+#### 🅰️ Set Up DNS Records
+
+Go to your domain registrar and add an **A record** pointing to your VPS IP:
 
 | Type | Name | Value             |
-|------|------|-------------------|
-| A    | *  | `195.xxx.xxx.xxx` |
+| ---- | ---- | ----------------- |
+| A    | @    | `195.xxx.xxx.xxx` |
 
-#### B. Install Nginx & Certbot
+
+#### 🧱 Install Caddy (for HTTPS + Reverse Proxy)
 
 ```bash
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+chmod o+r /etc/apt/sources.list.d/caddy-stable.list
 sudo apt update
-sudo apt install nginx certbot python3-certbot-nginx -y
+sudo apt install caddy
 ```
 
-#### C. Configure Nginx
+#### ⚙️ Configure Caddy
 
-1.  **Create a New Nginx Config:**
+1. **Edit the Caddyfile:**
 
-    ```bash
-    sudo nano /etc/nginx/sites-available/domain.com
-    ```
+   ```bash
+   sudo nano /etc/caddy/Caddyfile
+   ```
 
-    Paste the following (replace `domain.com` with your domain):
+2. **Replace contents with:**
 
-    ```nginx
-    server {
-        listen 80;
-        server_name domain.com;
+   ```caddy
+   your-domain.com {
+       reverse_proxy localhost:8000
+   }
+   ```
 
-        location / {
-            proxy_pass http://localhost:8000;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        }
-    }
-    ```
+   * Replace `your-domain.com` with your actual domain name.
+   * Adjust the port if you changed it in `config.env`.
 
-2.  **Enable the Site:**
+3. **Save and reload Caddy:**
 
-    ```bash
-    sudo ln -s /etc/nginx/sites-available/domain.com /etc/nginx/sites-enabled/domain.com
-    ```
-3. **Reload Nginx:**
-
-    ```bash
-    sudo nginx -t
-    sudo systemctl restart nginx
-    ```
+   ```bash
+   sudo systemctl reload caddy
+   ```
 
 
-#### D. Secure with HTTPS (Let's Encrypt)
-
-```bash
-sudo certbot --nginx -d domain.com
-```
-
-Your API is now available at:  
-➡️ `https://domain.com`
+✅ Your API will now be available securely at:
+➡️ `https://your-domain.com`
 
 
 # 📺 Setting up Stremio
@@ -423,8 +465,8 @@ If you want to use **only** your **Telegram Stremio Media Server addon** for met
 
 ### 2️⃣ Step 2: Remove “Cinemeta” Protection
 
-1.  Log in to your **Stremio account** via your **web browser**:
-    👉 [https://app.strem.io/shell-v4.4/\#/](https://app.strem.io/shell-v4.4/#/)
+1.  Log in to your **Stremio account** using **Chrome or Chromium-based browser** :
+    👉 [https://web.stremio.com/](https://web.stremio.com/)
 2.  Once logged in, open your **browser console** (`Ctrl + Shift + J` on Windows/Linux or `Cmd + Option + J` on macOS).
 3.  Copy and paste the code below into the console and press **Enter**:
 

@@ -36,16 +36,15 @@ async def file_receive_handler(client: Client, message: Message):
         try:
             if message.video or (message.document and message.document.mime_type.startswith("video/")):
                 file = message.video or message.document
-
-                caption = message.caption
-                title = caption or file.file_name
+                title = message.caption or file.file_name
                 msg_id = message.id
                 size = get_readable_file_size(file.file_size)
                 channel = str(message.chat.id).replace("-100", "")
 
                 metadata_info = await metadata(clean_filename(title), int(channel), msg_id)
                 if metadata_info is None:
-                    return await message.reply_text("> Not added, check log")
+                    LOGGER.warning(f"Metadata failed for file: {title} (ID: {msg_id})")
+                    return
 
                 title = remove_urls(title)
                 if not title.endswith(('.mkv', '.mp4')):
